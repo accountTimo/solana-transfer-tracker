@@ -1,0 +1,142 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>solana-tracker dashboard</title>
+<link rel="stylesheet" href="style.css" />
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4"></script>
+</head>
+<body>
+<header class="page-header">
+  <h1>solana-tracker</h1>
+  <p class="subtitle">Native SOL transfers &ge; 1 SOL, live from mainnet</p>
+</header>
+
+<div id="alert-banners"></div>
+
+<main>
+  <section class="stat-row" id="stat-row">
+    <div class="stat-tile">
+      <span class="stat-label">Total transfers</span>
+      <span class="stat-value" id="stat-total-count">&mdash;</span>
+    </div>
+    <div class="stat-tile">
+      <span class="stat-label">Total volume</span>
+      <span class="stat-value" id="stat-total-sol">&mdash;</span>
+    </div>
+    <div class="stat-tile">
+      <span class="stat-label">Transfers (24h)</span>
+      <span class="stat-value" id="stat-count-24h">&mdash;</span>
+    </div>
+    <div class="stat-tile">
+      <span class="stat-label">Volume (24h)</span>
+      <span class="stat-value" id="stat-sol-24h">&mdash;</span>
+    </div>
+    <div class="stat-tile">
+      <span class="stat-label">Alert threshold</span>
+      <input type="number" id="alert-threshold" value="50" min="1" step="1" />
+    </div>
+  </section>
+
+  <section class="chart-card">
+    <h2>SOL volume per hour <span class="muted">(last 24h)</span></h2>
+    <div class="chart-wrap">
+      <canvas id="volume-chart"></canvas>
+    </div>
+  </section>
+
+  <section class="charts-row">
+    <div class="chart-card">
+      <h2>Volume by program</h2>
+      <div class="chart-wrap chart-wrap-small">
+        <canvas id="program-chart"></canvas>
+      </div>
+    </div>
+
+    <div class="chart-card">
+      <h2>Transfer size distribution</h2>
+      <div class="chart-wrap chart-wrap-small">
+        <canvas id="size-chart"></canvas>
+      </div>
+    </div>
+
+    <div class="chart-card">
+      <h2>Activity by hour of day <span class="muted">(all-time)</span></h2>
+      <div class="chart-wrap chart-wrap-small">
+        <canvas id="heatmap-chart"></canvas>
+      </div>
+    </div>
+  </section>
+
+  <section class="table-card">
+    <h2>Top addresses <span class="muted">(by combined volume sent + received)</span></h2>
+    <div class="table-scroll">
+      <table>
+        <thead>
+          <tr><th>#</th><th>Address</th><th>Volume</th><th>Transfers</th></tr>
+        </thead>
+        <tbody id="leaderboard-body"></tbody>
+      </table>
+    </div>
+  </section>
+
+  <section class="search-card">
+    <h2>Search by address</h2>
+    <form id="search-form" class="search-form">
+      <input type="text" id="search-input" placeholder="Paste a Solana address…" />
+      <button type="submit">Search</button>
+      <button type="button" id="search-clear">Clear</button>
+    </form>
+  </section>
+
+  <section class="tables-row">
+    <div class="table-card">
+      <h2 id="recent-title">Most recent transfers</h2>
+      <div class="table-scroll">
+        <table>
+          <thead>
+            <tr><th>Time</th><th>Amount</th><th>Program</th><th>Source</th><th>Destination</th><th>Tx</th></tr>
+          </thead>
+          <tbody id="recent-body"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="table-card">
+      <h2>Top 10 largest transfers</h2>
+      <div class="table-scroll">
+        <table>
+          <thead>
+            <tr><th>Time</th><th>Amount</th><th>Program</th><th>Source</th><th>Destination</th><th>Tx</th></tr>
+          </thead>
+          <tbody id="top-body"></tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+
+  <section class="table-card">
+    <h2>Watchlist</h2>
+    <form id="watchlist-form" class="search-form">
+      <input type="text" id="watchlist-address" placeholder="Address to watch…" />
+      <input type="text" id="watchlist-label" placeholder="Label (optional)" />
+      <button type="submit">Add</button>
+    </form>
+    <ul id="watchlist-entries" class="watchlist-entries"></ul>
+
+    <h3>Watchlist activity</h3>
+    <div class="table-scroll">
+      <table>
+        <thead>
+          <tr><th>Time</th><th>Amount</th><th>Program</th><th>Source</th><th>Destination</th><th>Tx</th></tr>
+        </thead>
+        <tbody id="watchlist-activity-body"></tbody>
+      </table>
+    </div>
+  </section>
+</main>
+
+<script src="app.js"></script>
+</body>
+</html>

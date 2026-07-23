@@ -1,7 +1,19 @@
 [package]
-name = "solana-whale-tracker"
+name = "solana-tracker"
 version = "0.1.0"
 edition = "2024"
+
+[lib]
+name = "solana_tracker"
+path = "src/lib.rs"
+
+[[bin]]
+name = "tracker"
+path = "src/bin/tracker.rs"
+
+[[bin]]
+name = "dashboard"
+path = "src/bin/dashboard.rs"
 
 [dependencies]
 reqwest = { version = "0.12", features = ["json", "blocking"] }
@@ -9,3 +21,6 @@ serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 rusqlite = { version = "0.31", features = ["bundled"] }
 chrono = "0.4"
+axum = "0.7"
+tokio = { version = "1", features = ["full"] }
+tower-http = { version = "0.5", features = ["fs"] }
