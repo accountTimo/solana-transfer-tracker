@@ -18,9 +18,12 @@ queue.
 The project is split into a shared library (`src/lib.rs`, modules `rpc`,
 `transfer`, `db`, `labels`) and two binaries built on top of it:
 
-1. **Ingestion** (`src/bin/tracker.rs`) — polls the public Solana RPC
-   endpoint for the current chain tip (`getSlot`) and fetches each new
-   block (`getBlock`) as it's produced.
+1. **Ingestion** (`src/bin/tracker.rs`) — polls the public Solana RPC for
+   the current chain tip (`getSlot`) and fetches each new block
+   (`getBlock`) as it's produced. [src/rpc.rs](src/rpc.rs)'s `RpcClient`
+   rotates across multiple free public endpoints on rate limits or
+   transport errors, so one endpoint being throttled doesn't stall
+   ingestion — it just moves to the next.
 2. **Decoding** ([src/transfer.rs](src/transfer.rs)) — requests blocks with
    `jsonParsed` encoding, so the Solana RPC node decodes native System
    Program transfer instructions for us (no manual instruction-data parsing
@@ -79,10 +82,24 @@ cargo run --release --bin tracker      # polls mainnet, fills transfers.db
 cargo run --release --bin dashboard    # serves http://127.0.0.1:3000
 ```
 
-`tracker` runs indefinitely, printing each detected transfer and persisting
-it to `transfers.db` in the project directory. `dashboard` serves live stats,
-recent/top transfers, an hourly volume chart, search, watchlist, and alerts,
+`tracker` runs indefinitely in normal (live-tail) mode, printing each
+detected transfer and persisting it to `transfers.db`. `dashboard` serves
+live stats, recent/top transfers, charts, search, watchlist, and alerts,
 refreshing every 5s.
+
+To pull in a chunk of history instead of only live-tailing, set
+`BACKFILL_HOURS`:
+
+```sh
+BACKFILL_HOURS=24 cargo run --release --bin tracker
+```
+
+This seeds the starting slot ~24h behind the chain tip and processes
+unthrottled (no fixed poll delay) until it catches up, then **exits on its
+own** with a summary instead of sliding into an indefinite live tail — a
+backfill run is meant to grab a bounded window and finish. Throughput
+depends entirely on the free public endpoints' mood; expect on the order of
+a few slots/second, so a 24h backfill can take several hours.
 
 ## Scope / what's not handled (yet)
 
@@ -98,3 +115,56 @@ refreshing every 5s.
 - Alerts are in-page only (banner + row highlight on refresh), not browser
   desktop notifications — they only fire while the dashboard tab is open.
 - The RPC client and HTTP layer are not unit tested (see "Testing").
+
+## Architecture & design decisions
+
+A few choices worth explaining, not just stating:
+
+**Why Rust.** A live, unbounded, occasionally-inconsistent data source
+(blockchain blocks) has to be ingested, decoded, filtered, and persisted
+continuously — the same shape as any real streaming pipeline. Rust gives
+predictable performance without GC pauses (relevant for a process meant to
+keep pace with a live chain) and compile-time safety without C++'s manual
+memory management — a reasonable fit for something meant to run unattended
+for hours.
+
+**Two binaries sharing one library, not a monolith.** Ingestion and the
+dashboard have different failure modes and different lifecycles — the
+tracker needs to survive for hours unattended, the dashboard is a short-lived
+read-only view a human is actively looking at. Splitting them means a
+dashboard bug can't take down ingestion, and vice versa, while `rpc`,
+`transfer`, `db`, and `labels` stay as one tested, shared implementation
+instead of two copies drifting apart.
+
+**Catch-up vs. live-tail as two speeds of the same loop**, not two separate
+code paths. Early on, `tracker` paced every slot at a fixed 1.5s interval
+regardless of how far behind the chain tip it was — fine for live-tailing,
+but it meant catching up 24h of history would have taken over a day. The
+fix wasn't a rewrite: the same loop skips the sleep while more than a few
+slots behind, and resumes pacing once caught up. One `catching_up` boolean,
+not two implementations to maintain.
+
+**Multi-endpoint failover over a paid RPC provider.** A dedicated provider
+(Helius, QuickNode) would remove rate-limit risk entirely, but costs money
+for a portfolio-scale project. Rotating across multiple free public
+endpoints on transport failures gets most of the resilience benefit — in
+practice, an unthrottled 24h backfill ran for hours against two free
+endpoints without a single rate-limit hit — at zero cost. That's a real
+engineering trade-off (cost vs. reliability guarantees), made deliberately
+rather than defaulted into.
+
+**Where I chose not to guess.** The label system in `src/labels.rs` maps
+well-known *program* IDs (Jupiter, Raydium, pump.fun) to names, but
+deliberately ships with an empty *wallet address* label table. Attributing
+a specific address to a named real-world entity (an exchange, a person)
+without a verifiable source risks asserting something false — and when I
+tried to verify a few high-volume addresses from live data against public
+explorers, none of them returned a confirmed label anyway, which validated
+the caution rather than making it feel overly conservative in hindsight.
+The mechanism is there; entries only get added once verified against a
+trusted source.
+
+**What I'd do differently with more time/budget:** capture SPL token
+transfers (not just native SOL — the bigger remaining data gap), and move
+to a paid RPC provider if this ever needed to run continuously rather than
+in bounded demo sessions.
