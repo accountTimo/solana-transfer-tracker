@@ -11,7 +11,10 @@ function shortSig(sig) {
 
 function fmtTime(blockTime) {
   if (blockTime == null) return "—";
-  return new Date(blockTime * 1000).toLocaleTimeString();
+  const d = new Date(blockTime * 1000);
+  const isToday = d.toDateString() === new Date().toDateString();
+  const time = d.toLocaleTimeString();
+  return isToday ? time : `${d.toLocaleDateString()} ${time}`;
 }
 
 function fmtSol(lamports) {
